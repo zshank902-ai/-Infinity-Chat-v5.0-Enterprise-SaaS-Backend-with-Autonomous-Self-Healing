@@ -167,7 +167,7 @@ def get_health():
 
 @app.on_event("startup")
 async def startup_event():
-    # Start the Sentinel Monitor in the background
+    # Start the Sentinel Monitor in the background safely
     asyncio.create_task(sentinel.monitor_loop())
 
 @app.get("/projects")
