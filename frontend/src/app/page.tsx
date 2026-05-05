@@ -6,7 +6,6 @@ import {
   Settings, FolderTree, Zap, Shield, 
   Activity, Download, RefreshCw, Layers, Cpu
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -212,10 +211,9 @@ function DashboardContent() {
               <span className="text-xs font-mono text-indigo-300">{phase}</span>
             </div>
             <div className="w-32 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+              <div 
+                className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500" 
+                style={{ width: `${progress}%` }} 
               />
             </div>
           </div>
@@ -223,17 +221,14 @@ function DashboardContent() {
 
         {/* Chat / Viewport */}
         <main className="flex-1 overflow-y-auto p-8 flex flex-col gap-6 scroll-smooth">
-          <AnimatePresence>
-            {messages.map((msg, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn(
-                  "flex gap-4 max-w-[85%]",
-                  msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
-                )}
-              >
+          {messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "flex gap-4 max-w-[85%]",
+                msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
+              )}
+            >
                 <div className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shrink-0",
                   msg.role === "ai" ? "bg-indigo-600 shadow-indigo-500/20" : "bg-slate-700 shadow-slate-900/40"
@@ -246,9 +241,9 @@ function DashboardContent() {
                 )}>
                   {msg.content}
                 </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
+              </div>
+            </div>
+          ))}
           <div ref={chatEndRef} />
         </main>
 

@@ -1,18 +1,11 @@
-@import "tailwindcss";
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: #6366f1;
-  --color-secondary: #a855f7;
-  --color-accent: #22d3ee;
-  --color-card: #1e293b;
-  --color-border: #334155;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --background: #0f172a;
   --foreground: #f8fafc;
+  --primary: #6366f1;
 }
 
 body {
