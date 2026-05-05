@@ -79,10 +79,25 @@ Required for production stability:
 
 ### 5.2 Local Execution
 
+## 7. Frontend Dashboard (Next.js)
+
+The project includes a premium, glassmorphic dashboard for real-time agent orchestration.
+
+### 7.1 Setup
 ```bash
-docker build -t infinity-backend .
-docker run -p 7860:7860 infinity-backend
+cd frontend
+npm install
+npm run dev
 ```
+
+### 7.2 Features
+- **Real-time Swarm Tracking**: Live progress and phase monitoring.
+- **Persistent Chat**: Resumes state automatically from Redis.
+- **Live Workspace**: Instant file explorer for generated project files.
+
+---
+
+Bhai, Infinity Chat v5.0 is now a complete Industrial SaaS Suite. 🚀🔥
 
 ## 6. Security & Compliance
 
