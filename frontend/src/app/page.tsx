@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:7860";
 
-export default function Dashboard() {
+export default function DashboardContent() {
   const [messages, setMessages] = useState([
     { role: "ai", content: "Infinity Core v5.0 Online. Systems Nominal. How can I assist you in your industrial build today?" }
   ]);
@@ -353,4 +353,22 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+import dynamic from "next/dynamic";
+
+const DynamicDashboard = dynamic(() => Promise.resolve(DashboardContent), {
+  ssr: false,
+  loading: () => (
+    <div className="h-screen w-full bg-[#020617] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Cpu className="w-12 h-12 text-indigo-500 animate-spin" />
+        <p className="text-slate-400 text-sm font-mono animate-pulse">Initializing Neural Swarm...</p>
+      </div>
+    </div>
+  )
+});
+
+export default function Dashboard() {
+  return <DynamicDashboard />;
 }
