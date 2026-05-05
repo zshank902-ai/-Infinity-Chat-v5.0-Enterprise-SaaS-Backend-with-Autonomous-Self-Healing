@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import { Cpu } from "lucide-react";
 
-// Dynamically import the dashboard with SSR disabled
-const DynamicDashboard = dynamic(() => import("./Dashboard"), {
+// Dynamically import the dashboard with SSR disabled from the components folder
+const DynamicDashboard = dynamic(() => import("../components/Dashboard"), {
   ssr: false,
   loading: () => (
     <div className="h-screen w-full bg-[#020617] flex items-center justify-center">
