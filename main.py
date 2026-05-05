@@ -103,6 +103,25 @@ async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/files/{session_id}")
+async def list_session_files(session_id: str):
+    try:
+        project_path = Path(f"./projects/{session_id}")
+        if not project_path.exists():
+            return {"files": []}
+        
+        files = []
+        for file in project_path.rglob("*"):
+            if file.is_file():
+                files.append({
+                    "name": file.name,
+                    "path": str(file.relative_to(project_path)),
+                    "type": file.suffix.replace(".", "")
+                })
+        return {"files": files}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/upload")
 async def upload_file(session_id: str, file: UploadFile = File(...)):
     temp_path = Path(f"./data/temp_{file.filename}")
