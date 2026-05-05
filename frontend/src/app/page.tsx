@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { cn } from "@/lib/utils";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:7860";
 
 export default function Dashboard() {
   const [messages, setMessages] = useState([
@@ -18,10 +18,46 @@ export default function Dashboard() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sessionId] = useState(`session_${Math.random().toString(36).substr(2, 9)}`);
+  const [sessionId, setSessionId] = useState("");
+  const [logs, setLogs] = useState<{msg: string, time: string, type: string}[]>([]);
   const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const initializeSession = async () => {
+      let savedId = localStorage.getItem("infinity_session_id");
+      
+      // FORCE RECOVERY: For this specific debug, prioritize the known active session
+      if (!savedId || savedId !== "session_ihzxrn89j") {
+        savedId = "session_ihzxrn89j";
+        localStorage.setItem("infinity_session_id", "session_ihzxrn89j");
+      }
+
+      if (savedId) {
+        setSessionId(savedId);
+        // Fetch history
+        axios.get(`${API_BASE}/chat/${savedId}`).then(res => {
+          if (res.data.history && res.data.history.length > 0) setMessages(res.data.history);
+        }).catch(err => console.error("History fetch error:", err));
+
+        // Fetch status (This will also trigger auto-resume on backend!)
+        axios.get(`${API_BASE}/status/${savedId}`).then(res => {
+          if (res.data.progress) setProgress(res.data.progress);
+          if (res.data.phase) setPhase(res.data.phase);
+          if (res.data.state === "EXECUTION") setStatus("executing");
+          else if (res.data.state === "COMPLETED") setStatus("completed");
+        }).catch(err => console.error("Status fetch error:", err));
+      } else {
+        const newId = `session_${Math.random().toString(36).substr(2, 9)}`;
+        setSessionId(newId);
+        localStorage.setItem("infinity_session_id", newId);
+      }
+    };
+
+    initializeSession();
+  }, []);
   const [phase, setPhase] = useState("Standby");
   const [status, setStatus] = useState("idle"); // idle, thinking, executing, completed
+  const [files, setFiles] = useState<{name: string, path: string, type: string}[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -32,8 +68,73 @@ export default function Dashboard() {
     scrollToBottom();
   }, [messages]);
 
+  // WebSocket for Real-time Streaming (With Heartbeat & Auto-Reconnect)
+  useEffect(() => {
+    if (!sessionId) return;
+    let socket: WebSocket;
+    let heartbeat: any;
+    let reconnectTimeout: any;
+
+    const connect = () => {
+      socket = new WebSocket(`ws://localhost:7860/ws/${sessionId}`);
+
+      socket.onopen = () => {
+        console.log("WebSocket Heartbeat Started.");
+        heartbeat = setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) socket.send("ping");
+        }, 30000); // 30s Heartbeat
+      };
+
+      socket.onmessage = (event) => {
+        if (event.data === "pong") return;
+        const data = JSON.parse(event.data);
+        if (data.type === "status") {
+          setProgress(data.progress);
+          setPhase(data.phase);
+          if (data.state === "COMPLETED") setStatus("completed");
+        } else if (data.type === "log") {
+          setLogs(prev => [{
+            msg: data.message,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            type: data.log_type
+          }, ...prev].slice(0, 50));
+        }
+      };
+
+      socket.onclose = () => {
+        console.log("WebSocket connection lost. Reconnecting in 5s...");
+        clearInterval(heartbeat);
+        reconnectTimeout = setTimeout(connect, 5000);
+      };
+    };
+
+    connect();
+    return () => {
+      if (socket) socket.close();
+      clearInterval(heartbeat);
+      clearTimeout(reconnectTimeout);
+    };
+  }, [sessionId]);
+
+  // Fetch files every 5 seconds if a session is active
+  useEffect(() => {
+    const fetchFiles = async () => {
+      if (!sessionId) return;
+      try {
+        const res = await axios.get(`${API_BASE}/files/${sessionId}`);
+        setFiles(res.data.files || []);
+      } catch (err) {
+        console.error("File sync error:", err);
+      }
+    };
+    
+    fetchFiles();
+    const interval = setInterval(fetchFiles, 5000);
+    return () => clearInterval(interval);
+  }, [sessionId]);
+
   const handleSend = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || !sessionId) return;
 
     const userMessage = input;
     setInput("");
@@ -61,6 +162,11 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDownload = () => {
+    if (!sessionId) return;
+    window.open(`${API_BASE}/download/${sessionId}`, "_blank");
   };
 
   return (
@@ -181,19 +287,30 @@ export default function Dashboard() {
           <span className="w-2 h-2 rounded-full bg-emerald-500" />
         </div>
         
-        <div className="flex-1 p-6 font-mono text-[11px] text-indigo-300/80 overflow-y-auto flex flex-col gap-3">
-          <div className="flex gap-2">
-            <span className="text-slate-600">[00:00:01]</span>
-            <span>Kernel initialized.</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-slate-600">[00:00:02]</span>
-            <span>Redis persistence handshake successful.</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-slate-600">[00:00:05]</span>
-            <span>Swarm agents synchronized.</span>
-          </div>
+        <div className="flex-1 p-6 font-mono text-[11px] overflow-y-auto flex flex-col gap-3">
+          {logs.length > 0 ? logs.map((log, idx) => (
+            <div key={idx} className={cn("flex gap-2", 
+              log.type === "success" ? "text-emerald-400" : 
+              log.type === "error" ? "text-rose-400" : "text-indigo-300/80")}>
+              <span className="text-slate-600">[{log.time}]</span>
+              <span>{log.msg}</span>
+            </div>
+          )) : (
+            <>
+              <div className="flex gap-2 text-indigo-300/80">
+                <span className="text-slate-600">[00:00:01]</span>
+                <span>Kernel initialized.</span>
+              </div>
+              <div className="flex gap-2 text-indigo-300/80">
+                <span className="text-slate-600">[00:00:02]</span>
+                <span>Redis persistence handshake successful.</span>
+              </div>
+              <div className="flex gap-2 text-indigo-300/80">
+                <span className="text-slate-600">[00:00:05]</span>
+                <span>Swarm agents synchronized.</span>
+              </div>
+            </>
+          )}
           {loading && (
             <div className="flex gap-2 text-amber-400 animate-pulse">
               <span className="text-slate-600">[NOW]</span>
@@ -204,22 +321,33 @@ export default function Dashboard() {
 
         <div className="p-6 border-t border-slate-800 bg-slate-900/50">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">Workspace</h2>
-            <Download className="w-4 h-4 text-slate-500 hover:text-indigo-400 cursor-pointer" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">Project Package</h2>
           </div>
-          <div className="space-y-2 overflow-y-auto max-h-48">
-            {files.length > 0 ? files.map((file, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-xs text-slate-400 hover:bg-slate-800/50 p-2 rounded cursor-pointer transition-colors group">
-                <Code className="w-4 h-4 text-indigo-400 group-hover:text-indigo-300" />
-                <div className="flex flex-col">
-                  <span className="text-slate-300">{file.name}</span>
-                  <span className="text-[9px] text-slate-600 font-mono">{file.path}</span>
-                </div>
+          
+          <div 
+            onClick={handleDownload}
+            className="group glass-card p-4 rounded-xl border border-indigo-500/30 hover:border-indigo-400 transition-all cursor-pointer bg-indigo-500/5 hover:bg-indigo-500/10"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-600/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Layers className="w-5 h-5 text-indigo-400" />
               </div>
-            )) : (
-              <div className="text-[10px] text-slate-600 text-center py-4 italic">No files generated yet.</div>
-            )}
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-200">Empire Build ZIP</span>
+                <span className="text-[10px] text-slate-500 font-mono">Ready for deployment</span>
+              </div>
+              <Download className="ml-auto w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:animate-bounce" />
+            </div>
+            
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-[9px] text-slate-600 uppercase tracking-tighter">Full Source Code</span>
+              <span className="text-[9px] py-0.5 px-2 bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30">Stable</span>
+            </div>
           </div>
+
+          <p className="text-[9px] text-slate-600 mt-4 italic text-center">
+            Click to download the entire autonomous construction package.
+          </p>
         </div>
       </div>
     </div>

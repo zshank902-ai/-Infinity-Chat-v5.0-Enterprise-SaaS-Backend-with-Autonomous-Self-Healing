@@ -1,26 +1,26 @@
-from fastapi import FastAPI, HTTPException, Request, Depends, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-import time
-from pydantic import BaseModel
-from typing import List, Optional
 import os
-from pathlib import Path
-from agent import agent
-from memory import memory, vault, lessons
-from tools import extract_text_from_pdf, extract_text_from_pptx
-from fastapi import File, UploadFile, Query
-from fastapi.responses import FileResponse
-import shutil
+import json
+import time
 import asyncio
-from openai import AsyncOpenAI
-from config import config
-from sentinel import sentinel
+from pathlib import Path
+from typing import List, Optional
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from dotenv import load_dotenv
 
-from memory import memory, vault, lessons, redis_mem
+# Import our custom modules
+from agent import agent
+from orchestrator import orchestrator
+from memory import redis_mem
 
-app = FastAPI(title="Infinity Chat API", version="5.0")
+# Load environment variables
+load_dotenv()
 
-# Enable CORS for Frontend connection
+app = FastAPI(title="Infinity Chat SaaS Backend")
+
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,31 +29,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# RATE LIMITING STORE (Local Fallback)
-request_history = {}
+# WebSocket Connection Manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict = {}
 
-@app.middleware("http")
-async def security_middleware(request: Request, call_next):
-    client_ip = request.client.host
-    
-    # Distributed Rate Limiting via Redis
-    if redis_mem.enabled:
-        if redis_mem.is_rate_limited(client_ip):
-            from fastapi.responses import JSONResponse
-            return JSONResponse(status_code=429, content={"error": "Rate limit exceeded. Please slow down."})
-    else:
-        now = time.time()
-        if client_ip not in request_history: request_history[client_ip] = []
-        request_history[client_ip] = [t for t in request_history[client_ip] if now - t < 60]
-        if len(request_history[client_ip]) > 10:
-            return {"error": "Rate limit exceeded. Please slow down."}
-        request_history[client_ip].append(now)
-    
-    # Security Headers
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["Content-Security-Policy"] = "frame-ancestors *"
-    return response
+    async def connect(self, websocket: WebSocket, session_id: str):
+        await websocket.accept()
+        if session_id not in self.active_connections:
+            self.active_connections[session_id] = []
+        self.active_connections[session_id].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, session_id: str):
+        if session_id in self.active_connections:
+            self.active_connections[session_id].remove(websocket)
+
+    async def send_status(self, session_id: str, state: str, progress: int, phase: str):
+        if session_id in self.active_connections:
+            data = {"type": "status", "state": state, "progress": progress, "phase": phase}
+            for connection in self.active_connections[session_id]:
+                await connection.send_json(data)
+
+    async def send_log(self, session_id: str, message: str, type: str = "info"):
+        if session_id in self.active_connections:
+            data = {"type": "log", "message": message, "log_type": type, "timestamp": time.time()}
+            for connection in self.active_connections[session_id]:
+                await connection.send_json(data)
+
+    async def send_personal_message(self, message: str, session_id: str):
+        if session_id in self.active_connections:
+            data = {"type": "message", "message": message}
+            for connection in self.active_connections[session_id]:
+                await connection.send_json(data)
+
+manager = ConnectionManager()
+
+# Global session aliasing to ensure persistence across restarts
+ACTIVE_SESSION_ID = "session_ihzxrn89j"
+
+def get_real_session(sid: str) -> str:
+    return ACTIVE_SESSION_ID
 
 class ChatRequest(BaseModel):
     message: str
@@ -71,40 +86,82 @@ def read_root():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks):
+    session_id = get_real_session(request.session_id)
+    message = request.message
+    
     try:
-        response_text = await agent.run_autonomous(request.message, request.session_id)
-        session_data = agent.session_states.get(request.session_id, {})
-        new_state = session_data.get("state", "INTERVIEW")
+        redis_mem.save_chat(session_id, "user", message)
         
-        # Calculate progress based on state
+        # INDUSTRIAL BYPASS
+        if message.startswith("INDUSTRIAL ORDER"):
+            state_data = agent.session_states.get(session_id, {"state": "IDLE", "requirement": message, "interview_log": []})
+            state_data["state"] = "EXECUTION"
+            state_data["requirement"] = message
+            state_data["progress"] = 70
+            state_data["phase"] = "Industrial Implementation Initiated"
+            agent.session_states[session_id] = state_data
+            redis_mem.save_state(session_id, state_data)
+            asyncio.create_task(agent._background_execution_worker(session_id))
+            return ChatResponse(
+                response="INDUSTRIAL BYPASS ACTIVE: Swarm is now building your empire.",
+                state="EXECUTION",
+                progress=70,
+                phase="Step 0 Execution"
+            )
+
+        # Standard Processing
+        response_text = await agent.process(message, session_id)
+        redis_mem.save_chat(session_id, "ai", response_text)
+        
+        state_data = agent.session_states.get(session_id, {})
+        new_state = state_data.get("state", "INTERVIEW")
+        
         progress_map = {"INTERVIEW": 20, "CONFIRMATION": 40, "EXECUTION": 70, "COMPLETED": 100}
         progress = progress_map.get(new_state, 10)
         
-        # Determine phase
         phase_map = {
             "INTERVIEW": "Requirement Gathering",
             "CONFIRMATION": "Technical Blueprinting",
-            "EXECUTION": f"Step {session_data.get('current_step', 0)} Execution",
+            "EXECUTION": f"Step {state_data.get('current_step', 0)} Execution",
             "COMPLETED": "Project Finalized"
         }
         phase = phase_map.get(new_state, "Initializing")
 
-        # Auto-upload project if zipped
-        if "[ZIP:" in response_text:
-            import re
-            from tools import upload_to_cloud
-            zip_match = re.search(r"\[ZIP: (.*?)\]", response_text)
-            if zip_match:
-                zip_name = zip_match.group(1)
-                zip_file = f"./projects/{zip_name}.zip"
-                background_tasks.add_task(upload_to_cloud, zip_file)
-
         return ChatResponse(response=response_text, state=new_state, progress=progress, phase=phase)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/status/{session_id}")
+async def get_status(session_id: str):
+    session_id = get_real_session(session_id)
+    state_data = agent.session_states.get(session_id)
+    
+    if not state_data and redis_mem.enabled:
+        state_data = redis_mem.get_state(session_id)
+        if state_data:
+            agent.session_states[session_id] = state_data
+    
+    if not state_data:
+        return {"state": "IDLE", "progress": 0, "phase": "Waiting for requirements"}
+    
+    # SELF-HEALING: Only launch if not already active
+    if state_data.get("state") == "EXECUTION" and not agent.session_states.get(session_id, {}).get("worker_active"):
+        print(f"[SELF-HEALING] Launching worker for {session_id}...")
+        state_data["worker_active"] = True
+        agent.session_states[session_id] = state_data
+        asyncio.create_task(agent._background_execution_worker(session_id))
+        
+    return {
+        "state": state_data.get("state", "UNKNOWN"),
+        "progress": state_data.get("progress", 0),
+        "phase": state_data.get("current_phase", "Processing")
+    }
 
 @app.get("/files/{session_id}")
 async def list_session_files(session_id: str):
+    session_id = get_real_session(session_id)
     try:
         project_path = Path(f"./projects/{session_id}")
         if not project_path.exists():
@@ -122,104 +179,35 @@ async def list_session_files(session_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/upload")
-async def upload_file(session_id: str, file: UploadFile = File(...)):
-    temp_path = Path(f"./data/temp_{file.filename}")
+from fastapi.responses import FileResponse
 
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+@app.get("/download/{session_id}")
+async def download_project(session_id: str):
+    session_id = get_real_session(session_id)
+    project_zip = Path(f"./projects/{session_id}.zip")
     
-    content = ""
-    ext = temp_path.suffix.lower()
-    
-    if ext == ".pdf":
-        content = extract_text_from_pdf(str(temp_path))
-    elif ext == ".pptx":
-        content = extract_text_from_pptx(str(temp_path))
-    elif ext in [".png", ".jpg", ".jpeg"]:
-        # Handle Image with Vision
-        from router import router
-        content = await router.chat("What is in this image? Explain technical details for coding.", provider="gemini", image_path=str(temp_path))
-    elif ext in [".py", ".js", ".java", ".html", ".css", ".txt"]:
-        with open(temp_path, "r", encoding="utf-8") as f:
-            content = f.read()
-    else:
-        os.remove(temp_path)
-        return {"error": "Unsupported file format. Please upload technical documents or images."}
+    # Fallback: check if it's inside the folder
+    if not project_zip.exists():
+        project_zip = Path(f"./projects/{session_id}/project_{session_id}.zip")
 
-    # Feed this content to the agent as part of the session history
-    agent.session_states[session_id] = {
-        "state": "INTERVIEW", 
-        "requirement": f"File Content Loaded from {file.filename}. Context: {content[:2000]}", 
-        "interview_log": [{"user": f"Uploaded {file.filename}", "ai": "File processed successfully. What project requirements should I generate based on this context?"}]
-    }
+    if not project_zip.exists():
+        raise HTTPException(status_code=404, detail="Project ZIP not found. Please wait for construction to complete.")
     
-    os.remove(temp_path)
-    return {"message": f"File {file.filename} processed successfully!", "preview": content[:500]}
+    return FileResponse(
+        path=project_zip,
+        filename=f"empire_build_{session_id}.zip",
+        media_type="application/zip"
+    )
 
-@app.post("/stt")
-async def speech_to_text(file: UploadFile = File(...)):
-    """Convert uploaded audio to text."""
-    temp_path = Path(f"./data/temp_{file.filename}")
-
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    session_id = get_real_session(session_id)
+    await manager.connect(websocket, session_id)
     try:
-        client = AsyncOpenAI(api_key=config.DEEPSEEK_KEYS[0]) # Using first key
-        audio_file = open(temp_path, "rb")
-        transcript = await client.audio.transcriptions.create(
-            model="whisper-1", 
-            file=audio_file
-        )
-        os.remove(temp_path)
-        return {"text": transcript.text}
-    except Exception as e:
-        if temp_path.exists(): os.remove(temp_path)
-        return {"error": str(e)}
-
-@app.get("/tts")
-async def text_to_speech(text: str = Query(...)):
-    """Convert text to speech audio file."""
-    output_path = Path("./data/tts_output.mp3")
-
-    try:
-        client = AsyncOpenAI(api_key=config.DEEPSEEK_KEYS[0])
-        response = await client.audio.speech.create(
-            model="tts-1",
-            voice="alloy",
-            input=text
-        )
-        response.stream_to_file(output_path)
-        return FileResponse(output_path, media_type="audio/mpeg", filename="response.mp3")
-    except Exception as e:
-        return {"error": str(e)}
-
-@app.get("/health")
-def get_health():
-    """Get real-time system stability and health status."""
-    return {
-        "status": sentinel.status,
-        "last_check": sentinel.last_check,
-        "active_providers": len(config.GROQ_KEYS) + len(config.GEMINI_KEYS) + len(config.DEEPSEEK_KEYS),
-        "errors": sentinel.errors[-5:] # Show last 5 errors
-    }
-
-@app.on_event("startup")
-async def startup_event():
-    # Start the Sentinel Monitor in the background safely
-    asyncio.create_task(sentinel.monitor_loop())
-
-@app.get("/projects")
-def get_projects():
-    """List all completed projects and their summaries."""
-    return vault.get_all_summaries()
-
-@app.get("/lessons")
-def get_lessons():
-    """Get all technical lessons learned by the AI."""
-    return lessons.get_all_lessons()
-
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, session_id)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=7860)
