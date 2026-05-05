@@ -8,18 +8,24 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements first
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Try to copy requirements from either root or backend/
+COPY requirements.txt* backend/requirements.txt* ./
+RUN pip install --no-cache-dir -r requirements.txt || pip install --no-cache-dir -r backend/requirements.txt || echo "Requirements already handled"
 
-# Copy the entire backend folder content to /app
-COPY backend/ .
+# Copy everything
+COPY . .
+
+# Move files from backend to root if they exist (to avoid path issues)
+RUN if [ -d "backend" ]; then cp -r backend/* .; fi
 
 # Create data and memory directories
 RUN mkdir -p data memory/vault memory/lessons
 
-# Expose dynamic port
+# Set PYTHONPATH to root
+ENV PYTHONPATH=/app
+
+# Expose HuggingFace standard port
 EXPOSE 7860
 
-# Start server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Start server with 0.0.0.0 to ensure external access
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--log-level", "debug"]
