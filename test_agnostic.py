@@ -5,7 +5,7 @@ import asyncio
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.agent import agent
+from agent import agent
 
 async def main():
     print("--- Testing Universal Agnostic Engine (Node.js) ---")

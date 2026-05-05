@@ -4,10 +4,12 @@ import os
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.agent import agent
-from backend.tools import BASE_PROJECT_PATH
+from agent import agent
+from tools import BASE_PROJECT_PATH
 
-def test_autonomous_mode():
+import asyncio
+
+async def test_autonomous_mode():
     print("--- Testing Autonomous Agent Mode ---")
     
     requirement = "Create a project named 'test_bot'. Inside it, create a file 'bot.py' that prints 'I am alive!' and run it."
@@ -15,7 +17,7 @@ def test_autonomous_mode():
     print(f"Task: {requirement}")
     print("Agent is thinking and working...")
     
-    response = agent.run_autonomous(requirement)
+    response = await agent.run_autonomous(requirement)
     
     print("\n--- Agent Response ---")
     print(response)
@@ -28,4 +30,4 @@ def test_autonomous_mode():
         print(f"[FAILED] File {bot_file} was not found.")
 
 if __name__ == "__main__":
-    test_autonomous_mode()
+    asyncio.run(test_autonomous_mode())
