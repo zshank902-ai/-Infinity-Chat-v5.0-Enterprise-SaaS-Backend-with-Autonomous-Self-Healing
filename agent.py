@@ -2,7 +2,7 @@ from router import router
 from tools import (create_directory, write_file, run_command, list_files, 
                    zip_directory, setup_environment, run_in_env, web_search, delete_directory,
                    kaggle_search, kaggle_download)
-from memory import memory, vault, lessons
+from memory import memory, vault, lessons, redis_mem
 from orchestrator import orchestrator
 import re
 import asyncio
@@ -48,6 +48,11 @@ class CodingAgent:
         session_path.mkdir(parents=True, exist_ok=True)
         self.current_project_path = str(session_path)
 
+        # LOAD STATE FROM REDIS (PERSISTENCE LAYER)
+        persisted_state = redis_mem.get_state(session_id)
+        if persisted_state:
+            self.session_states[session_id] = persisted_state
+        
         # Initialize state if new session
         if session_id not in self.session_states:
             self.session_states[session_id] = {"state": "INTERVIEW", "requirement": user_input, "interview_log": [], "path": self.current_project_path}
@@ -68,10 +73,12 @@ class CodingAgent:
 
             if confidence >= 85 or len(state_data["interview_log"]) > 4:
                  state_data["state"] = "CONFIRMATION"
+                 redis_mem.save_state(session_id, state_data) # SAVE BEFORE RECURSION
                  return await self.run_autonomous(user_input, session_id)
             
             questions = await orchestrator.interview_user(user_input)
             state_data["interview_log"].append({"user": user_input, "ai": questions, "confidence": confidence})
+            redis_mem.save_state(session_id, state_data) # SAVE STATE
             return f"[Confidence: {confidence}%]\n{questions}"
 
         if current_state == "CONFIRMATION":
@@ -80,8 +87,10 @@ class CodingAgent:
             
             if "proceed" in user_input.lower() or "launch" in user_input.lower() or "go" in user_input.lower():
                 state_data["state"] = "EXECUTION"
+                redis_mem.save_state(session_id, state_data) # SAVE STATE
                 return await self.run_autonomous(user_input, session_id)
             
+            redis_mem.save_state(session_id, state_data) # SAVE BLUEPRINT IN STATE
             return f"--- PROJECT BLUEPRINT ---\n{blueprint}\n\nProject blueprint generated. Are you satisfied with this plan? If yes, type 'PROCEED' to begin execution."
 
         if current_state == "EXECUTION":
@@ -101,6 +110,7 @@ class CodingAgent:
                     state_data["requirement"] += f"\n[NEW UPDATE]: {user_input}"
                     state_data["current_step"] = 0 # REWIND TO START REFACTORING
                     state_data["plan"] = await orchestrator.architect_plan(state_data["requirement"])
+                    redis_mem.save_state(session_id, state_data)
                     return f"New requirement noted. Refactoring the implementation plan and restarting execution to ensure full integration. (Type 'GO' to resume refactored execution)"
 
                 step = plan_steps[state_data["current_step"]]
@@ -109,11 +119,13 @@ class CodingAgent:
                 # Execute specific step
                 response = await self._execute_swarm(state_data["requirement"], step)
                 state_data["current_step"] += 1
+                redis_mem.save_state(session_id, state_data) # SAVE STEP PROGRESS
                 
                 return f"[STEP {state_data['current_step']}/{total_steps} COMPLETE]\n{response}\n\nCurrent phase successful. Any feedback or modifications required? If not, type 'GO' to continue project construction."
             
             # Final Lifecycle if all steps done
             state_data["state"] = "COMPLETED"
+            redis_mem.save_state(session_id, state_data)
             return await self.run_autonomous("Finalize", session_id)
 
         if current_state == "COMPLETED":
@@ -125,8 +137,10 @@ class CodingAgent:
             # Save session memory
             memory.save_chat(session_id, "ai", "Project construction finalized. The workspace is ready for deployment.")
             
-            # Final cleanup of session state
+            # Final cleanup of session state in Redis
             self.session_states.pop(session_id, None)
+            if redis_mem.enabled:
+                redis_mem.r.delete(f"state:{session_id}")
             return "CONSTRUCTION COMPLETE! The project has been successfully built and verified. Please retrieve your zipped workspace."
 
     async def _execute_swarm(self, requirement, plan):

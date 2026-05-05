@@ -16,36 +16,38 @@ from openai import AsyncOpenAI
 from config import config
 from sentinel import sentinel
 
+from memory import memory, vault, lessons, redis_mem
+
 app = FastAPI(title="Infinity Chat API", version="5.0")
 
 # Enable CORS for Frontend connection
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to your frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# RATE LIMITING STORE
+# RATE LIMITING STORE (Local Fallback)
 request_history = {}
 
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
     client_ip = request.client.host
-    now = time.time()
     
-    # Simple Rate Limiting (10 requests per minute)
-    if client_ip not in request_history:
-        request_history[client_ip] = []
-    
-    # Clean old timestamps
-    request_history[client_ip] = [t for t in request_history[client_ip] if now - t < 60]
-    
-    if len(request_history[client_ip]) > 10:
-        return {"error": "Rate limit exceeded. Please slow down your requests."}
-    
-    request_history[client_ip].append(now)
+    # Distributed Rate Limiting via Redis
+    if redis_mem.enabled:
+        if redis_mem.is_rate_limited(client_ip):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=429, content={"error": "Rate limit exceeded. Please slow down."})
+    else:
+        now = time.time()
+        if client_ip not in request_history: request_history[client_ip] = []
+        request_history[client_ip] = [t for t in request_history[client_ip] if now - t < 60]
+        if len(request_history[client_ip]) > 10:
+            return {"error": "Rate limit exceeded. Please slow down."}
+        request_history[client_ip].append(now)
     
     # Security Headers
     response = await call_next(request)

@@ -12,31 +12,60 @@ class RedisMemory:
         self.enabled = False
         try:
             import redis
-            # Using environment variables for Upstash/Railway Redis
-            self.r = redis.Redis(
-                host=os.getenv("REDIS_HOST", "localhost"),
-                port=int(os.getenv("REDIS_PORT", 6379)),
-                password=os.getenv("REDIS_PASSWORD", None),
-                decode_responses=True
-            )
+            redis_url = os.getenv("REDIS_URL")
+            if redis_url:
+                self.r = redis.Redis.from_url(redis_url, decode_responses=True, ssl_cert_reqs=None)
+            else:
+                self.r = redis.Redis(
+                    host=os.getenv("REDIS_HOST", "localhost"),
+                    port=int(os.getenv("REDIS_PORT", 6379)),
+                    password=os.getenv("REDIS_PASSWORD", None),
+                    decode_responses=True
+                )
             self.r.ping()
             self.enabled = True
             print("[MEMORY] Redis Connected. Global sync enabled.")
-        except:
+        except Exception as e:
             self.r = None
-            print("[MEMORY] Redis unavailable. Using Local RAM fallback.")
+            print(f"[MEMORY] Redis unavailable: {e}. Using Local RAM fallback.")
 
     def save_chat(self, session_id, role, content):
         if self.enabled:
             history = self.get_history(session_id)
             history.append({"role": role, "content": content})
-            self.r.set(f"chat:{session_id}", json.dumps(history))
+            self.r.set(f"chat:{session_id}", json.dumps(history), ex=3600*24) # 24h expiry
         
     def get_history(self, session_id):
         if self.enabled:
             data = self.r.get(f"chat:{session_id}")
             return json.loads(data) if data else []
         return []
+
+    def is_rate_limited(self, key, limit=10, window=60):
+        """Check if a key (like IP) has exceeded the rate limit."""
+        if not self.enabled: return False # Fallback to no limit or local logic
+        
+        current = self.r.get(f"ratelimit:{key}")
+        if current is not None and int(current) >= limit:
+            return True
+        
+        pipe = self.r.pipeline()
+        pipe.incr(f"ratelimit:{key}")
+        pipe.expire(f"ratelimit:{key}", window)
+        pipe.execute()
+        return False
+
+    def save_state(self, session_id, state_dict):
+        """Persist the entire agent session state (God-Mode Persistence)."""
+        if self.enabled:
+            self.r.set(f"state:{session_id}", json.dumps(state_dict), ex=3600*12) # 12h persistence
+
+    def get_state(self, session_id):
+        """Retrieve the persisted agent session state."""
+        if self.enabled:
+            data = self.r.get(f"state:{session_id}")
+            return json.loads(data) if data else None
+        return None
     
 class Memory:
     def __init__(self):
@@ -117,5 +146,6 @@ class LessonVault:
         return lessons
 
 memory = Memory()
+redis_mem = RedisMemory()
 vault = ProjectVault()
 lessons = LessonVault()

@@ -49,18 +49,33 @@ graph TD
     Tools --> Sandbox[Isolated Project Workspace]
 ```
 
-## 5. Deployment and Scalability
+## 5. Advanced Industrial Features 🛡️
+
+### 5.1 Multi-Session Isolation
+- Every session has a dedicated workspace in `./projects/{session_id}`.
+- Automated tool execution is isolated to prevent cross-session data leakage.
+
+### 5.2 God-Mode Persistence (Redis) 🧠
+- **Global State Sync**: Uses Redis (Upstash/Local) to store agent session states.
+- **Resilience**: The system can resume any task from the exact step even after a server restart.
+- **Distributed Memory**: Rate limiting and chat history are shared across the cluster.
+
+### 5.3 Standardized API Schema 🏗️
+- **POST `/chat`**: Returns real-time `progress` (%) and `phase` status for frontend progress bars.
+
+## 6. Deployment and Scalability
 
 The system is optimized for **HuggingFace Spaces** and **Docker-native** environments.
 
-### 5.1 Environment Variables (Secrets)
+### 6.1 Environment Variables (Secrets)
 
 Required for production stability:
 
 - `GROQ_API_KEY_1`, `GROQ_API_KEY_2` (Redundancy)
 - `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`
 - `DEEPSEEK_API_KEY_1`
-- `KAGGLE_USERNAME`, `KAGGLE_KEY` (Data Science Scavenging)
+- `KAGGLE_USERNAME`, `KAGGLE_KEY`
+- `REDIS_URL` (For Persistence)
 
 ### 5.2 Local Execution
 
