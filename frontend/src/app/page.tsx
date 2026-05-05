@@ -4,15 +4,16 @@ import React, { useState, useEffect, useRef } from "react";
 import { 
   Send, Bot, User, Code, Terminal, 
   Settings, FolderTree, Zap, Shield, 
-  Activity, Download, RefreshCw, Layers 
+  Activity, Download, RefreshCw, Layers, Cpu
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:7860";
 
-export default function DashboardContent() {
+function DashboardContent() {
   const [messages, setMessages] = useState([
     { role: "ai", content: "Infinity Core v5.0 Online. Systems Nominal. How can I assist you in your industrial build today?" }
   ]);
@@ -21,6 +22,13 @@ export default function DashboardContent() {
   const [sessionId, setSessionId] = useState("");
   const [logs, setLogs] = useState<{msg: string, time: string, type: string}[]>([]);
   const [progress, setProgress] = useState(0);
+  const [phase, setPhase] = useState("Standby");
+  const [status, setStatus] = useState("idle"); // idle, thinking, executing, completed
+  const [files, setFiles] = useState<{name: string, path: string, type: string}[]>([]);
+  
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const initializeSession = async () => {
@@ -55,10 +63,6 @@ export default function DashboardContent() {
 
     initializeSession();
   }, []);
-  const [phase, setPhase] = useState("Standby");
-  const [status, setStatus] = useState("idle"); // idle, thinking, executing, completed
-  const [files, setFiles] = useState<{name: string, path: string, type: string}[]>([]);
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -355,7 +359,6 @@ export default function DashboardContent() {
   );
 }
 
-import dynamic from "next/dynamic";
 
 const DynamicDashboard = dynamic(() => Promise.resolve(DashboardContent), {
   ssr: false,
