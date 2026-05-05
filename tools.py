@@ -12,6 +12,8 @@ BASE_PROJECT_PATH = Path("./projects")
 
 def create_directory(rel_path, base_path=BASE_PROJECT_PATH):
     full_path = Path(base_path) / rel_path
+    if full_path.exists() and full_path.is_file():
+        return f"Warning: Path {rel_path} is a file, cannot create directory."
     full_path.mkdir(parents=True, exist_ok=True)
     return f"Directory created: {rel_path}"
 
@@ -55,30 +57,30 @@ def run_command(command, timeout=30, cwd=None):
     except Exception as e:
         return f"Exception: {str(e)}"
 
-def setup_environment(path):
-    full_path = BASE_PROJECT_PATH / path
+def setup_environment(rel_path, base_path=BASE_PROJECT_PATH):
+    full_path = Path(base_path) / rel_path
     
     # Python detection
     if (full_path / "requirements.txt").exists():
-        print(f"[SETUP] Python project detected in {path}. Creating venv...")
-        run_command(f"python -m venv {path}/venv")
+        print(f"[SETUP] Python project detected in {rel_path}. Creating venv...")
+        run_command(f"python -m venv venv", cwd=full_path)
         return "Python venv created."
     
     # Node detection
     if (full_path / "package.json").exists():
-        print(f"[SETUP] Node.js project detected in {path}. Running npm install...")
-        run_in_env(path, "npm install")
+        print(f"[SETUP] Node.js project detected in {rel_path}. Running npm install...")
+        run_in_env(rel_path, "npm install", base_path=base_path)
         return "Node.js dependencies installed."
 
     # Java/Spring Boot detection
     if (full_path / "pom.xml").exists():
-        print(f"[SETUP] Java/Maven project detected in {path}. Ready for mvnw.")
+        print(f"[SETUP] Java/Maven project detected in {rel_path}. Ready for mvnw.")
         return "Java/Maven project detected."
     
     return "No specific environment needed or detected."
 
-def run_in_env(project_rel_path, command):
-    project_path = (BASE_PROJECT_PATH / project_rel_path).resolve()
+def run_in_env(project_rel_path, command, base_path=BASE_PROJECT_PATH):
+    project_path = (Path(base_path) / project_rel_path).resolve()
     
     # Cross-platform venv detection
     venv_python_win = project_path / "venv" / "Scripts" / "python.exe"
@@ -194,13 +196,18 @@ def extract_text_from_pptx(file_path):
     except Exception as e:
         return f"PPTX Error: {e}"
 
-def zip_directory(rel_path, base_path=BASE_PROJECT_PATH):
-    full_path = Path(base_path) / rel_path
-    zip_path = Path(base_path) / f"{rel_path}.zip"
-    if full_path.exists():
-        shutil.make_archive(str(Path(base_path) / rel_path), 'zip', full_path)
-        return f"Project zipped successfully: {rel_path}.zip"
-    return "Error: Directory not found."
+def zip_directory(directory_path, zip_name):
+    """Zips a directory and returns the path to the zip file."""
+    try:
+        base_dir = os.path.dirname(directory_path)
+        folder_name = os.path.basename(directory_path)
+        output_path = os.path.join(base_dir, zip_name.replace(".zip", ""))
+        
+        # Create archive
+        shutil.make_archive(output_path, 'zip', directory_path)
+        return f"{output_path}.zip"
+    except Exception as e:
+        return f"Zip Error: {e}"
 
 def upload_to_cloud(file_path, bucket_name="infinity-projects"):
     """Uploads a file to S3-compatible storage (SaaS ready)."""

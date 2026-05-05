@@ -2,11 +2,11 @@ from router import router
 
 class Orchestrator:
     def __init__(self):
-        self.consultant = "gemini"   # User Interview & Requirements
-        self.architect = "gemini"    # Planning & Design
-        self.developer = "deepseek"  # Better for Industrial Coding
-        self.researcher = "gemini"   # Good for web-scavenging
-        self.data_scientist = "deepseek" # Good for complex ML logic
+        self.consultant = "groq"     # User Interview & Requirements (Llama 3.3)
+        self.architect = "groq"      # Planning & Design (Llama 3.3)
+        self.developer = "groq"      # Standardized to Groq for reliability
+        self.researcher = "groq"     # Good for web-scavenging
+        self.data_scientist = "groq" # Standardized
         self.security = "groq"       # Security Audit (Fast)
         self.tester = "groq"         # Bug Finding (Fast)
 
@@ -24,8 +24,9 @@ class Orchestrator:
         return await router.chat(prompt, provider=self.architect)
 
     async def architect_plan(self, requirement):
-        prompt = f"Role: Senior Architect\nTask: Design the BEST architecture for: {requirement}. For microservices, provide Dockerfiles for each service and a central docker-compose.yml."
-        return await router.chat(prompt, provider=self.architect)
+        prompt = f"Role: Senior Architect\nTask: Generate a STACK OF COMMANDS to build: {requirement}. \nSTRICT RULE: Your response must ONLY be a numbered list of tags. NO TEXT. \nExample: \n1. [MKDIR: app] \n2. [WRITE_FILE: app/main.py] content [/WRITE_FILE] \nStart now."
+        response = await router.chat(prompt, provider=self.architect)
+        return response["response"]
 
     async def security_audit(self, code):
         prompt = f"Role: Cybersecurity Expert\nTask: Audit this code for vulnerabilities (SQL Injection, XSS, etc.). Respond with 'SECURE' or a list of issues:\n\n{code}"

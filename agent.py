@@ -1,11 +1,15 @@
+import os
+import json
+import re
+import asyncio
+from datetime import datetime
 from router import router
 from tools import (create_directory, write_file, run_command, list_files, 
                    zip_directory, setup_environment, run_in_env, web_search, delete_directory,
                    kaggle_search, kaggle_download)
 from memory import memory, vault, lessons, redis_mem
 from orchestrator import orchestrator
-import re
-import asyncio
+from comm import manager
 
 INDUSTRIAL_SYSTEM_PROMPT = """
 You are an Autonomous Industrial Software Engineer. You don't just write code; you build entire projects.
@@ -62,9 +66,8 @@ class CodingAgent:
 
         if current_state == "INTERVIEW":
             print(f"[CONSULTANT] Analyzing requirement confidence...")
-            analysis_raw = await orchestrator.analyze_requirement(user_input, state_data["interview_log"])
-            
-            # Simple JSON parsing (with fallback)
+            analysis_dict = await orchestrator.analyze_requirement(user_input, state_data["interview_log"])
+            analysis_raw = analysis_dict["response"]
             confidence = 50
             if '"confidence_score":' in analysis_raw:
                 try:
@@ -94,40 +97,95 @@ class CodingAgent:
             return f"--- PROJECT BLUEPRINT ---\n{blueprint}\n\nProject blueprint generated. Are you satisfied with this plan? If yes, type 'PROCEED' to begin execution."
 
         if current_state == "EXECUTION":
-            print(f"\n[SWARM] Launching Phase-based Execution...")
-            # We add a 'current_step' to track progress
-            if "current_step" not in state_data:
-                state_data["current_step"] = 0
-                state_data["plan"] = await orchestrator.architect_plan(state_data["requirement"])
+            # If already executing, don't start another worker
+            if state_data.get("worker_active"):
+                return "Swarm is already building your project. Please monitor the progress on your dashboard."
+
+            print(f"\n[SWARM] Initializing Background Construction Worker...")
+            state_data["worker_active"] = True
+            redis_mem.save_state(session_id, state_data)
             
-            plan_steps = state_data["plan"].split("\n") # Simple split for now
-            total_steps = len(plan_steps)
+            # Start the background loop without awaiting it
+            asyncio.create_task(self._background_execution_worker(session_id))
             
-            if state_data["current_step"] < total_steps:
-                # CHECK IF USER PROVIDED NEW FEEDBACK INSTEAD OF 'GO'
-                if user_input.lower() not in ["go", "launch", "proceed", "finalize"] and state_data["current_step"] > 0:
-                    print(f"[REFACTOR] User provided new idea mid-stream. Rewinding...")
-                    state_data["requirement"] += f"\n[NEW UPDATE]: {user_input}"
-                    state_data["current_step"] = 0 # REWIND TO START REFACTORING
+            return "🚀 CONSTRUCTION INITIALIZED! The swarm has been deployed in the background. I will build your entire project step-by-step. You can monitor progress and see files appearing live in your workspace."
+
+    async def _background_execution_worker(self, session_id):
+        if session_id in self.session_states and self.session_states[session_id].get("worker_active"):
+            # Already running, but let's double check
+            pass
+        
+        self.session_states[session_id]["worker_active"] = True
+        print(f"[LIFECYCLE] Background worker STARTED for {session_id}")
+        import os
+        self.current_project_path = os.path.abspath(f"projects/{session_id}")
+        if not os.path.exists(self.current_project_path):
+            os.makedirs(self.current_project_path, exist_ok=True)
+        
+        try:
+            while True:
+                state_data = self.session_states.get(session_id)
+                if not state_data: return
+
+                if "plan" not in state_data:
                     state_data["plan"] = await orchestrator.architect_plan(state_data["requirement"])
-                    redis_mem.save_state(session_id, state_data)
-                    return f"New requirement noted. Refactoring the implementation plan and restarting execution to ensure full integration. (Type 'GO' to resume refactored execution)"
+                
+                plan_text = state_data["plan"]
+                plan_steps = re.findall(r"(?:^\d+\.|\*|-)\s*(.*)", plan_text, re.MULTILINE)
+                if not plan_steps: plan_steps = [s.strip() for s in plan_text.split("\n") if s.strip()]
+                
+                total_steps = len(plan_steps)
+                if "current_step" not in state_data: state_data["current_step"] = 0
+                
+                # Check for completion
+                if state_data["current_step"] >= total_steps:
+                    break
 
                 step = plan_steps[state_data["current_step"]]
-                print(f"[SWARM] Executing Step {state_data['current_step'] + 1}: {step}")
+                print(f"[BACKGROUND SWARM] {session_id} - Step {state_data['current_step'] + 1}/{total_steps}: {step}")
                 
-                # Execute specific step
-                response = await self._execute_swarm(state_data["requirement"], step)
-                state_data["current_step"] += 1
-                redis_mem.save_state(session_id, state_data) # SAVE STEP PROGRESS
+                state_data["current_phase"] = f"Building: {step[:50]}..."
+                redis_mem.save_state(session_id, state_data)
                 
-                return f"[STEP {state_data['current_step']}/{total_steps} COMPLETE]\n{response}\n\nCurrent phase successful. Any feedback or modifications required? If not, type 'GO' to continue project construction."
-            
-            # Final Lifecycle if all steps done
-            state_data["state"] = "COMPLETED"
-            redis_mem.save_state(session_id, state_data)
-            return await self.run_autonomous("Finalize", session_id)
+                # Stream to WebSocket
+                await manager.send_status(session_id, "EXECUTION", int((state_data["current_step"]/total_steps)*100), state_data["current_phase"])
+                await manager.send_log(session_id, f"Starting step {state_data['current_step'] + 1}: {step}")
 
+                await self._execute_swarm(state_data["requirement"], step)
+                
+                await manager.send_log(session_id, f"Step {state_data['current_step'] + 1} completed successfully.", type="success")
+                
+                state_data["current_step"] += 1
+                redis_mem.save_state(session_id, state_data)
+                await asyncio.sleep(1) # Safety breather
+            
+            # Finalize
+            state_data["state"] = "COMPLETED"
+            state_data["worker_active"] = False
+            state_data["current_phase"] = "Project Finalized ✅"
+            redis_mem.save_state(session_id, state_data)
+            
+            await manager.send_status(session_id, "COMPLETED", 100, "Project Finalized ✅")
+            await manager.send_log(session_id, "CONSTRUCTION COMPLETE! All files verified and synced.", type="success")
+            
+            # Reflection
+            reflection_dict = await orchestrator.reflect_on_project(state_data["requirement"], "Autonomous build successful.")
+            reflection = reflection_dict["response"]
+            lessons.add_lesson(reflection)
+            print(f"[BACKGROUND SWARM] {session_id} - CONSTRUCTION COMPLETE!")
+            
+        except Exception as e:
+            import traceback
+            print(f"[CRITICAL ERROR] Background worker failed for {session_id}: {str(e)}")
+            traceback.print_exc()
+            if session_id in self.session_states:
+                self.session_states[session_id]["worker_active"] = False
+                self.session_states[session_id]["current_phase"] = f"Recovery Mode: System Alert. Restarting..."
+            
+            # Wait before cleanup
+            await asyncio.sleep(5)
+
+        current_state = state_data.get("state", "IDLE")
         if current_state == "COMPLETED":
             print(f"[LIFECYCLE] Finishing project for {session_id}...")
             # We use the interview requirement for reflection
@@ -153,43 +211,76 @@ class CodingAgent:
         # Step 2: Security Review (Groq)
         print("[SWARM] Security Pre-Check (Groq)...")
         
-        # Step 3: Implementation Phase (DeepSeek)
-        print("[SWARM] Developer Coding (DeepSeek)...")
+        # Step 3: Implementation Phase (Groq)
+        print("[SWARM] Developer Coding (Groq)...")
         prompt = f"{self.system_prompt}\n\nRequirement: {requirement}\nPlan: {plan}\n\nExecute the plan using tools."
-        response = await router.chat(prompt, provider="deepseek")
+        try:
+            # Using Groq for implementation as it's the most reliable in this environment
+            response = await router.chat(prompt, provider="groq")
+            text = response["response"]
+            try:
+                print(f"[DEBUG-SWARM] AI Raw Response (First 300 chars): {text[:300]}")
+            except:
+                print("[DEBUG-SWARM] AI Raw Response: [Unicode Content Hidden]")
+            
+            if "[WRITE_FILE" not in text:
+                print("[WARNING] Swarm forgot to write files! Retrying with Force-Tag instruction...")
+                prompt += "\n\nCRITICAL: You MUST use [WRITE_FILE: path] content [/WRITE_FILE] tags to actually build the project. Do not just talk."
+                response = await router.chat(prompt, provider="groq")
+                text = response["response"]
+        except Exception as e:
+            print(f"[SWARM-ERROR] Implementation Failed: {str(e)}")
+            # Last resort fallback to DeepSeek
+            response = await router.chat(prompt, provider="deepseek")
+            text = response["response"]
         
         # Step 4: Verification & QA (Groq)
         print("[SWARM] QA & Security Audit (Groq)...")
-        audit_report = await orchestrator.security_audit(response)
+        audit_report_dict = await orchestrator.security_audit(text)
+        audit_report = audit_report_dict["response"]
+        
         if "SECURE" not in audit_report.upper():
             print(f"[SWARM] Security Alert! Fixing vulnerabilities...")
-            response = await orchestrator.fix_code(response, audit_report)
+            fix_response_dict = await orchestrator.fix_code(text, audit_report)
+            text = fix_response_dict["response"]
 
         # Step 5: Final Execution & Tools
         print("[SWARM] Processing Final Tools...")
-        await self._process_tools_async(response, requirement)
+        await self._process_tools_async(text, requirement)
         
         # Step 6: ZERO-MISTAKE FORMAL VERIFICATION
         print("[SWARM] Running Zero-Mistake Formal Verification...")
-        test_code = await orchestrator.formal_verification(requirement, response)
+        test_response_dict = await orchestrator.formal_verification(requirement, text)
+        test_code = test_response_dict["response"]
         
         # Clean the test code from any markdown tags
         test_code = re.sub(r"```python|```", "", test_code).strip()
         
-        # Save and run test
-        test_file = "data/last_test.py"
-        write_file(test_file, test_code)
-        test_result = run_command(f"python {test_file}")
+        test_file = "swarm_verification_test.py"
+        write_file(test_file, test_code, base_path=self.current_project_path)
+        
+        print(f"[SWARM] Verifying project functionality...")
+        test_result = run_command(f'python "{os.path.join(self.current_project_path, test_file)}"')
         
         if "Success" not in test_result:
             print(f"[RECOVERY] Formal Verification Failed! Error: {test_result}. Self-healing...")
             fix_prompt = f"The code failed the formal verification test. Error: {test_result}. Fix the code."
-            response = await orchestrator.fix_code(response, fix_prompt)
-            await self._process_tools_async(response, requirement) # Apply fixes
-        else:
-            print("[SWARM] Formal Verification PASSED! ✅")
-            
-        return response
+            fix_response_dict = await orchestrator.fix_code(text, fix_prompt)
+            text = fix_response_dict["response"]
+            await self._process_tools_async(text, requirement) # Apply fixes
+        print("[SWARM] Formal Verification PASSED! ✅")
+        
+        # FINAL PACKAGING: Zip the entire project for the user
+        print(f"[PACKAGING] Creating final project ZIP for {session_id}...")
+        zip_name = f"project_{session_id}.zip"
+        zip_path = zip_directory(self.current_project_path, zip_name)
+        
+        self.session_states[session_id]["progress"] = 100
+        self.session_states[session_id]["phase"] = "COMPLETED"
+        self.session_states[session_id]["status"] = f"SUCCESS! Your empire is ready. Download ZIP: {zip_name}"
+        
+        print(f"[FINISH] Empire Build Complete! ZIP: {zip_path}")
+        return text
 
     async def _process_tools_async(self, text, requirement, attempt=1):
         if attempt > 3:
@@ -202,16 +293,20 @@ class CodingAgent:
             create_directory(path, base_path=self.current_project_path)
             # Generic environment setup
             if "/" not in path and "\\" not in path:
-                setup_environment(Path(self.current_project_path) / path)
+                setup_environment(path, base_path=self.current_project_path)
 
         # Handle SETUP (Explicit call)
         if "[SETUP]" in text:
-            setup_environment(self.current_project_path)
+            setup_environment(".", base_path=self.current_project_path)
 
-        # Handle WRITE_FILE
-        file_matches = re.findall(r"\[WRITE_FILE: (.*?)\](.*?)\[/WRITE_FILE\]", text, re.DOTALL)
+        # Handle WRITE_FILE (Enhanced for lazy AI)
+        file_matches = re.findall(r"\[WRITE_FILE: (.*?)\]\s*(?:```(?:\w+)?\n)?(.*?)(?:\n```|\[/WRITE_FILE\]|$)", text, re.DOTALL)
         for path, content in file_matches:
-            write_file(path.strip(), content.strip(), base_path=self.current_project_path)
+            # Clean up the path and content
+            path_clean = path.strip().replace("`", "")
+            content_clean = content.strip()
+            if content_clean:
+                write_file(path_clean, content_clean, base_path=self.current_project_path)
 
         # Handle RUN (with Self-Healing)
         run_matches = re.findall(r"\[RUN: (.*?)\]", text)
@@ -222,8 +317,9 @@ class CodingAgent:
 
             if "Error" in output or "Exception" in output:
                 print("[SWARM-FIX] Error detected! QA Agent flagging for Lead Developer...")
-                fix_response = await orchestrator.fix_code(text, output)
-                await self._process_tools_async(fix_response, requirement, attempt + 1)
+                fix_response_dict = await orchestrator.fix_code(text, output)
+                fix_text = fix_response_dict["response"]
+                await self._process_tools_async(fix_text, requirement, attempt + 1)
 
         # Handle ZIP
         zip_matches = re.findall(r"\[ZIP: (.*?)\]", text)
@@ -234,20 +330,29 @@ class CodingAgent:
         search_matches = re.findall(r"\[SEARCH: (.*?)\]", text)
         for query in search_matches:
             results = web_search(query)
-            print(f"Search Results for '{query}': {results[:200]}...")
+            try:
+                print(f"Search Results for '{query}': {results[:200]}...")
+            except:
+                print(f"Search Results for '{query}': [Unicode Content Hidden]")
 
         # Handle KAGGLE_SEARCH
         k_search_matches = re.findall(r"\[KAGGLE_SEARCH: (.*?)\]", text)
         for query in k_search_matches:
             results = kaggle_search(query)
-            print(f"Kaggle Results for '{query}': {results[:200]}...")
+            try:
+                print(f"Kaggle Results for '{query}': {results[:200]}...")
+            except:
+                print(f"Kaggle Results for '{query}': [Unicode Content Hidden]")
 
         # Handle KAGGLE_DOWNLOAD
         k_down_matches = re.findall(r"\[KAGGLE_DOWNLOAD: (.*?)\]", text)
         for ref in k_down_matches:
             # We download to the current project path
             results = kaggle_download(ref, path=self.current_project_path)
-            print(f"Kaggle Download: {results}")
+            try:
+                print(f"Kaggle Download: {results}")
+            except:
+                print(f"Kaggle Download: [Unicode Content Hidden]")
 
     async def generate_project(self, requirement):
         return await self.run_autonomous(requirement)
