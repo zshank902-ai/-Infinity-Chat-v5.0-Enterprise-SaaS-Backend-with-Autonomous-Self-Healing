@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: infinity-chat-backend
+  labels:
+    app: infinity-chat
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: infinity-chat
+  template:
+    metadata:
+      labels:
+        app: infinity-chat
+    spec:
+      containers:
+      - name: backend
+        image: zeeshanpy/infinity-chat:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - secretRef:
+            name: infinity-chat-secrets
+        resources:
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: infinity-chat-service
+spec:
+  selector:
+    app: infinity-chat
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: LoadBalancer

@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+data/
+memory/
+projects/
+*.zip
+*.log
+.DS_Store
+venv/
+node_modules/
