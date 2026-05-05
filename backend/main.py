@@ -5,16 +5,16 @@ from pydantic import BaseModel
 from typing import List, Optional
 import os
 from pathlib import Path
-from .agent import agent
-from .memory import memory, vault, lessons
-from .tools import extract_text_from_pdf, extract_text_from_pptx
+from agent import agent
+from memory import memory, vault, lessons
+from tools import extract_text_from_pdf, extract_text_from_pptx
 from fastapi import File, UploadFile, Query
 from fastapi.responses import FileResponse
 import shutil
 import asyncio
 from openai import AsyncOpenAI
-from .config import config
-from .sentinel import sentinel
+from config import config
+from sentinel import sentinel
 
 app = FastAPI(title="Infinity Chat API", version="5.0")
 

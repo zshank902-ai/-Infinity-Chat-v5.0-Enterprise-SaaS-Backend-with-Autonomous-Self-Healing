@@ -5,7 +5,7 @@ import httpx
 from groq import AsyncGroq
 import google.generativeai as genai
 from openai import AsyncOpenAI
-from .config import config
+from config import config
 
 class APIRouter:
     def __init__(self):

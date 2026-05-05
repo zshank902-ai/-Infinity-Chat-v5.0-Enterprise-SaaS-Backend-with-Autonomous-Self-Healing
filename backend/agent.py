@@ -1,9 +1,9 @@
-from .router import router
-from .tools import (create_directory, write_file, run_command, list_files, 
+from router import router
+from tools import (create_directory, write_file, run_command, list_files, 
                    zip_directory, setup_environment, run_in_env, web_search, delete_directory,
                    kaggle_search, kaggle_download)
-from .memory import memory, vault, lessons
-from .orchestrator import orchestrator
+from memory import memory, vault, lessons
+from orchestrator import orchestrator
 import re
 import asyncio
 

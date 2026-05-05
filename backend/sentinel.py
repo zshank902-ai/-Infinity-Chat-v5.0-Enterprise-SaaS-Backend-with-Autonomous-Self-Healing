@@ -1,7 +1,7 @@
 import asyncio
 import time
-from .router import router
-from .config import config
+from router import router
+from config import config
 
 class InfinitySentinel:
     def __init__(self):
@@ -22,7 +22,7 @@ class InfinitySentinel:
 
     async def run_smoke_test(self):
         """Perform a lightweight end-to-end logic test."""
-        from .agent import agent
+        from agent import agent
         try:
             # Mock a small request
             test_req = "Test: Create a file named sentinel.txt"
@@ -30,7 +30,7 @@ class InfinitySentinel:
             agent.session_states[session_id] = {"state": "EXECUTION", "requirement": test_req}
             # Note: We won't actually run the full build to save tokens, 
             # just check if orchestrator can plan.
-            from .orchestrator import orchestrator
+            from orchestrator import orchestrator
             plan = await orchestrator.architect_plan(test_req)
             if plan:
                 return True

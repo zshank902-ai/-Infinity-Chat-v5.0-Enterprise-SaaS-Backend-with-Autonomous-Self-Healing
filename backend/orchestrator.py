@@ -1,4 +1,4 @@
-from .router import router
+from router import router
 
 class Orchestrator:
     def __init__(self):
