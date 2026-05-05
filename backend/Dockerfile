@@ -16,8 +16,8 @@ COPY . .
 # Create data and memory directories
 RUN mkdir -p data memory/vault memory/lessons
 
-# Expose port
+# Expose dynamic port
 EXPOSE 8000
 
-# Start server
+# Start server (Overridden by railway.json, but kept for local)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
