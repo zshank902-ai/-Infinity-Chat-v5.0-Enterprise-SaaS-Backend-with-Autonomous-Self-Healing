@@ -5,6 +5,8 @@ class Orchestrator:
         self.consultant = "gemini"   # User Interview & Requirements
         self.architect = "gemini"    # Planning & Design
         self.developer = "deepseek"  # Better for Industrial Coding
+        self.researcher = "gemini"   # Good for web-scavenging
+        self.data_scientist = "deepseek" # Good for complex ML logic
         self.security = "groq"       # Security Audit (Fast)
         self.tester = "groq"         # Bug Finding (Fast)
 
@@ -57,5 +59,9 @@ class Orchestrator:
     async def reflect_on_project(self, requirement, logs):
         prompt = f"Role: Senior Quality Auditor\nTask: Reflect on the project build for: {requirement}.\nExecution Logs: {logs}\nIdentify: 1. Top 3 technical lessons learned. 2. Mistakes to avoid next time. 3. Best library used."
         return await router.chat(prompt, provider=self.tester)
+
+    async def research_topic(self, topic):
+        prompt = f"Role: Senior Researcher\nTask: Research the following topic for technical implementation: {topic}.\nProvide: 1. Latest stable versions. 2. Best practices. 3. Potential pitfalls."
+        return await router.chat(prompt, provider=self.researcher)
 
 orchestrator = Orchestrator()

@@ -130,6 +130,12 @@ class CodingAgent:
             return "CONSTRUCTION COMPLETE! The project has been successfully built and verified. Please retrieve your zipped workspace."
 
     async def _execute_swarm(self, requirement, plan):
+        # Step 1: Research Phase (Researcher)
+        if any(kw in plan.lower() for kw in ["search", "find", "latest", "research"]):
+            print("[SWARM] Researcher Scavenging Web...")
+            research_results = await orchestrator.research_topic(plan)
+            requirement += f"\n[RESEARCH CONTEXT]: {research_results}"
+
         # Step 2: Security Review (Groq)
         print("[SWARM] Security Pre-Check (Groq)...")
         
