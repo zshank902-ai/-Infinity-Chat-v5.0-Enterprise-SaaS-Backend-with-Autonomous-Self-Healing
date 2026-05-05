@@ -1,67 +1,67 @@
----
-title: Infinity Chat v5.0
-emoji: 😎
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
----
-
-# Infinity Chat v5.0: The Autonomous Enterprise SaaS Engine
-
-**Infinity Chat** is not just a chatbot; it is a high-performance, autonomous software engineering swarm designed for the industrial-grade SaaS era. Built with a "Self-Healing" core and "Distributed Memory," it represents the pinnacle of agentic AI development.
-
-## 🚀 Key Features
-
-### 1. Autonomous Swarm Intelligence
-Unlike standard linear agents, Infinity Chat uses an **Orchestrator-Architect-Developer-QA** hierarchy. Every line of code is cross-verified by a security auditor before execution.
-
-### 2. Self-Healing Infrastructure
-Equipped with a recursive recovery loop, the system detects execution errors and "Self-Heals" by refactoring its own logic in real-time until the formal verification passes.
-
-### 3. Enterprise-Grade Memory (Redis + S3)
-- **Session Isolation:** Every user workspace is isolated via UUID-based sandboxing.
-- **Global Synchronization:** Integrated with Redis for distributed session persistence across cloud instances.
-
-### 4. Nuclear Security Gate
-A specialized security middleware that intercepts and blocks destructive shell commands (DDoS, rm -rf, etc.), ensuring the host system remains 100% secure.
-
-### 5. Cloud-Agnostic Deployment
-Fully containerized using **Docker**, with native support for **Railway.app** and **Oracle Cloud (Always Free)** via automated setup scripts.
+# Infinity Chat v5.0: Autonomous Self-Healing AI Backend
+**An Industrial-Grade Agentic SaaS Framework for Scalable Software Construction**
 
 ---
 
-## 📊 Comparison: Why Infinity Chat?
+## 1. Executive Summary
+Infinity Chat v5.0 is a decentralized, multimodal, and autonomous AI backend designed to orchestrate complex software engineering tasks. Unlike traditional chatbots, Infinity Chat implements an **Autonomous Agentic Swarm** architecture, where multiple specialized LLMs (Gemini, DeepSeek, Llama-3) collaborate in a tiered hierarchy to plan, implement, audit, and verify full-stack projects in real-time.
 
-| Feature | Standard AI Agents | Infinity Chat v5.0 |
-|---------|-------------------|--------------------|
-| **Execution** | Linear / One-off | **Recursive Swarm (Self-Healing)** |
-| **Memory** | Volatile (Lost on restart) | **Persistent (Redis + S3 Storage)** |
-| **Security** | Minimal / Sandbox only | **Nuclear Gate & Anti-DDoS Middleware** |
-| **Workspace** | Global (Risky) | **UUID-Isolated (Private & Secure)** |
-| **Uptime** | Manual Start | **24/7 Cloud-Ready (Dockerized)** |
+## 2. Core Methodology: The Autonomous Swarm
+The system operates on a multi-stage lifecycle, ensuring zero-mistake execution through cross-model verification.
+
+### 2.1 The Orchestrator Hierarchy
+- **The Consultant (Gemini-1.5-Pro):** Handles requirement elicitation and user interview.
+- **The Architect (Gemini/DeepSeek):** Generates technical blueprints and phase-based implementation plans.
+- **The Developer (DeepSeek-Coder):** High-precision code generation and logic implementation.
+- **The Auditor (Groq/Llama-70B):** Real-time security scanning and performance optimization.
+- **The Sentinel (Background Monitor):** Continuous health monitoring and self-healing of AI providers.
+
+## 3. Technical Comparison
+
+| Feature | Standard AI Wrappers | Infinity Chat v5.0 (Autonomous) |
+| :--- | :--- | :--- |
+| **Execution Model** | Stateless Request/Response | Stateful Phase-based Construction |
+| **Logic Verification** | User Manual Check | Automated Formal Verification (Python Assertions) |
+| **Self-Healing** | None (Returns Error) | Automated Fix & Retry Logic |
+| **Environment** | Host-dependent | Cross-platform Dockerized Workspaces |
+| **Memory** | Token-based (Short-term) | Persistent Neural Vault & Global Redis Sync |
+
+## 4. System Architecture
+The backend is built using FastAPI with a decoupled asynchronous engine.
+
+```mermaid
+graph TD
+    User((User)) --> API[FastAPI Gateway]
+    API --> Agent[Coding Agent]
+    Agent --> Orch[Orchestrator]
+    Orch --> Provider1[Gemini - Logic]
+    Orch --> Provider2[DeepSeek - Coding]
+    Orch --> Provider3[Groq - Audit]
+    Agent --> Tools[Tool Suite: FS/CLI/Kaggle]
+    Agent --> Vault[Persistent Memory]
+    Tools --> Sandbox[Isolated Project Workspace]
+```
+
+## 5. Deployment and Scalability
+The system is optimized for **HuggingFace Spaces** and **Docker-native** environments.
+
+### 5.1 Environment Variables (Secrets)
+Required for production stability:
+- `GROQ_API_KEY_1`, `GROQ_API_KEY_2` (Redundancy)
+- `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`
+- `DEEPSEEK_API_KEY_1`
+- `KAGGLE_USERNAME`, `KAGGLE_KEY` (Data Science Scavenging)
+
+### 5.2 Local Execution
+```bash
+docker build -t infinity-backend .
+docker run -p 7860:7860 infinity-backend
+```
+
+## 6. Security & Compliance
+- **X-Frame Protection:** Configured for cross-origin hosting (HuggingFace/SaaS portals).
+- **Non-Root Execution:** Containerized as UID 1000 for strict security compliance.
+- **Rate Limiting:** IP-based protection against automated logic scraping.
 
 ---
-
-## 🛠️ Tech Stack
-- **Backend:** FastAPI (Python)
-- **Memory:** Redis / Local JSON Fallback
-- **Models:** Gemini 1.5 Pro (Architect), Llama 3 (Developer), DeepSeek (Specialist)
-- **Infrastructure:** Docker, Nginx, Oracle Cloud ARM, Railway
-
----
-
-## 🛡️ Security & Privacy
-This repository is engineered with a **Zero-Data-Breach** policy. All sensitive configuration is handled via environment variables. No API keys or personal credentials are stored in the codebase.
-
----
-
-## ⚡ Deployment
-To deploy on your own VPS:
-1. Run `bash backend/deployment/vps_setup.sh`
-2. Configure `.env`
-3. Run `docker-compose up -d`
-
----
-*Created with ❤️ by Its_Zeesh 😎*
+*Developed by Zeeshan AI Enterprise Systems. All Rights Reserved 2026.*

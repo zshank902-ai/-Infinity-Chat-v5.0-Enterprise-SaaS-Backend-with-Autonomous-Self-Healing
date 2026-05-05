@@ -4,7 +4,7 @@ class Orchestrator:
     def __init__(self):
         self.consultant = "gemini"   # User Interview & Requirements
         self.architect = "gemini"    # Planning & Design
-        self.developer = "gemini"    # Coding
+        self.developer = "deepseek"  # Better for Industrial Coding
         self.security = "groq"       # Security Audit (Fast)
         self.tester = "groq"         # Bug Finding (Fast)
 

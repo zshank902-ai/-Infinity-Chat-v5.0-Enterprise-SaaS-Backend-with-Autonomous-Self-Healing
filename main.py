@@ -109,13 +109,13 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
             content = f.read()
     else:
         os.remove(temp_path)
-        return {"error": "Bhai, ye file format allowed nahi hai!"}
+        return {"error": "Unsupported file format. Please upload technical documents or images."}
 
     # Feed this content to the agent as part of the session history
     agent.session_states[session_id] = {
         "state": "INTERVIEW", 
         "requirement": f"File Content Loaded from {file.filename}. Context: {content[:2000]}", 
-        "interview_log": [{"user": f"Uploaded {file.filename}", "ai": "Bhai, file read kar li hai! Iske basis par kya banau?"}]
+        "interview_log": [{"user": f"Uploaded {file.filename}", "ai": "File processed successfully. What project requirements should I generate based on this context?"}]
     }
     
     os.remove(temp_path)
@@ -186,4 +186,4 @@ def get_lessons():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=7860)

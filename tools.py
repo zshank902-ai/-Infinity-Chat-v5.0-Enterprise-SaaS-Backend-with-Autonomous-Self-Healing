@@ -80,8 +80,12 @@ def setup_environment(path):
 def run_in_env(project_rel_path, command):
     project_path = (BASE_PROJECT_PATH / project_rel_path).resolve()
     
-    # Check for Python Venv
-    venv_python = project_path / "venv" / "Scripts" / "python.exe"
+    # Cross-platform venv detection
+    venv_python_win = project_path / "venv" / "Scripts" / "python.exe"
+    venv_python_lin = project_path / "venv" / "bin" / "python"
+    
+    venv_python = venv_python_win if venv_python_win.exists() else venv_python_lin
+    
     if venv_python.exists():
         if command.startswith("pip "):
             full_cmd = f'"{venv_python}" -m ' + command

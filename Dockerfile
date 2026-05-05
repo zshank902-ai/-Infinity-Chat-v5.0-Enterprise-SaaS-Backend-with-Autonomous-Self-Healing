@@ -8,21 +8,25 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Create a non-root user for HuggingFace
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
-# Copy the rest of the code
-COPY . .
+WORKDIR $HOME/app
 
-# Create data and memory directories
-RUN mkdir -p data memory/vault memory/lessons
+# Copy files with correct ownership
+COPY --chown=user . $HOME/app
 
-# Set PYTHONPATH
-ENV PYTHONPATH=/app
+# Install requirements as user
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Create necessary directories
+RUN mkdir -p data memory/vault memory/lessons projects
 
 # HuggingFace Standard Port
 EXPOSE 7860
 
 # Start server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["python", "main.py"]

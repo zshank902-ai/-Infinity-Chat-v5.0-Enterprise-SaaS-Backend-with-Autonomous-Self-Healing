@@ -61,7 +61,7 @@ class APIRouter:
         if not client: raise Exception("No Groq keys")
         resp = await client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-8b-instant"
+            model="llama-3.1-70b-versatile"
         )
         return resp.choices[0].message.content
 
@@ -95,7 +95,7 @@ class APIRouter:
                     json={"model": "llama3", "prompt": prompt, "stream": False},
                     timeout=120.0
                 )
-                return response.json().get("response", "Bhai, local brain is offline.")
+                return response.json().get("response", "Local inference engine offline.")
         except Exception as e:
             return f"CRITICAL FAILURE: All providers and Local Fallback failed. {str(e)}"
 

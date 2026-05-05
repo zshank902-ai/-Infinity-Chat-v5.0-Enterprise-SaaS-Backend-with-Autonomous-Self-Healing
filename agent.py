@@ -82,7 +82,7 @@ class CodingAgent:
                 state_data["state"] = "EXECUTION"
                 return await self.run_autonomous(user_input, session_id)
             
-            return f"--- PROJECT BLUEPRINT ---\n{blueprint}\n\nBhai, kya aap is plan se satisfied hain? Agar haan, toh 'PROCEED' likhiye."
+            return f"--- PROJECT BLUEPRINT ---\n{blueprint}\n\nProject blueprint generated. Are you satisfied with this plan? If yes, type 'PROCEED' to begin execution."
 
         if current_state == "EXECUTION":
             print(f"\n[SWARM] Launching Phase-based Execution...")
@@ -101,7 +101,7 @@ class CodingAgent:
                     state_data["requirement"] += f"\n[NEW UPDATE]: {user_input}"
                     state_data["current_step"] = 0 # REWIND TO START REFACTORING
                     state_data["plan"] = await orchestrator.architect_plan(state_data["requirement"])
-                    return f"Bhai, aapka naya idea note kar liya hai! Main pura plan refactor karke piche se start kar raha hoon taaki kuch bhi miss na ho. (Type 'GO' to start refactored execution)"
+                    return f"New requirement noted. Refactoring the implementation plan and restarting execution to ensure full integration. (Type 'GO' to resume refactored execution)"
 
                 step = plan_steps[state_data["current_step"]]
                 print(f"[SWARM] Executing Step {state_data['current_step'] + 1}: {step}")
@@ -110,7 +110,7 @@ class CodingAgent:
                 response = await self._execute_swarm(state_data["requirement"], step)
                 state_data["current_step"] += 1
                 
-                return f"[STEP {state_data['current_step']}/{total_steps} COMPLETE]\n{response}\n\nBhai, ye step ho gaya hai. Ab tak sab theek lag raha hai? Agar aapke dimaag mein koi naya idea aaya hai toh bata do, wo bhi abhi implement ho jayega. Warna 'GO' likho, kaam continue karte hain!"
+                return f"[STEP {state_data['current_step']}/{total_steps} COMPLETE]\n{response}\n\nCurrent phase successful. Any feedback or modifications required? If not, type 'GO' to continue project construction."
             
             # Final Lifecycle if all steps done
             state_data["state"] = "COMPLETED"
@@ -123,11 +123,11 @@ class CodingAgent:
             lessons.add_lesson(reflection)
             
             # Save session memory
-            memory.save_chat(session_id, "ai", "Bhai, project complete ho gaya hai! Aap isse download kar sakte hain.")
+            memory.save_chat(session_id, "ai", "Project construction finalized. The workspace is ready for deployment.")
             
             # Final cleanup of session state
             self.session_states.pop(session_id, None)
-            return "CHAMPION! Aapka project poori tarah se ready hai. Zipped file check kijiye!"
+            return "CONSTRUCTION COMPLETE! The project has been successfully built and verified. Please retrieve your zipped workspace."
 
     async def _execute_swarm(self, requirement, plan):
         # Step 2: Security Review (Groq)

@@ -11,7 +11,7 @@ async def test_flow():
     session_id = "test_user_123"
     
     print("--- Phase 1: Initial Request ---")
-    req1 = "Bhai, mujhe ek simple Weather App banani hai."
+    req1 = "I need a simple Weather Application with a clean UI."
     resp1 = await agent.run_autonomous(req1, session_id)
     print(f"User: {req1}")
     print(f"AI: {resp1}\n")
