@@ -54,4 +54,4 @@ To deploy on your own VPS:
 3. Run `docker-compose up -d`
 
 ---
-*Created with ❤️ by the Infinity Chat Engineering Team.*
+*Created with ❤️ by Its_Zeesh 😎*
