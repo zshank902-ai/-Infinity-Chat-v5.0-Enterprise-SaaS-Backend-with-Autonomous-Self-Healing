@@ -127,7 +127,7 @@ def kaggle_search(query):
         from kaggle.api.kaggle_api_extended import KaggleApi
         
         # Set environment variables for Kaggle API if present in our config
-        from .config import config
+        from config import config
         if hasattr(config, 'KAGGLE_USERNAME') and config.KAGGLE_USERNAME:
             os.environ['KAGGLE_USERNAME'] = config.KAGGLE_USERNAME
             os.environ['KAGGLE_KEY'] = config.KAGGLE_KEY
@@ -153,7 +153,7 @@ def kaggle_download(dataset_ref, path="."):
         from kaggle.api.kaggle_api_extended import KaggleApi
         
         # Set environment variables for Kaggle API if present in our config
-        from .config import config
+        from config import config
         if hasattr(config, 'KAGGLE_USERNAME') and config.KAGGLE_USERNAME:
             os.environ['KAGGLE_USERNAME'] = config.KAGGLE_USERNAME
             os.environ['KAGGLE_KEY'] = config.KAGGLE_KEY

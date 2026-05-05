@@ -74,7 +74,7 @@ async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks)
         # Auto-upload project if zipped
         if "[ZIP:" in response_text:
             import re
-            from .tools import upload_to_cloud
+            from tools import upload_to_cloud
             zip_match = re.search(r"\[ZIP: (.*?)\]", response_text)
             if zip_match:
                 zip_name = zip_match.group(1)
@@ -102,7 +102,7 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
         content = extract_text_from_pptx(str(temp_path))
     elif ext in [".png", ".jpg", ".jpeg"]:
         # Handle Image with Vision
-        from .router import router
+        from router import router
         content = await router.chat("What is in this image? Explain technical details for coding.", provider="gemini", image_path=str(temp_path))
     elif ext in [".py", ".js", ".java", ".html", ".css", ".txt"]:
         with open(temp_path, "r", encoding="utf-8") as f:
