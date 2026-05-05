@@ -25,7 +25,7 @@ class APIRouter:
         key = config.GEMINI_KEYS[self.gemini_key_index]
         self.gemini_key_index = (self.gemini_key_index + 1) % len(config.GEMINI_KEYS)
         genai.configure(api_key=key)
-        return genai.GenerativeModel('models/gemini-1.5-flash-latest')
+        return genai.GenerativeModel('gemini-1.5-flash')
 
     def get_deepseek_client(self):
         if not config.DEEPSEEK_KEYS: return None

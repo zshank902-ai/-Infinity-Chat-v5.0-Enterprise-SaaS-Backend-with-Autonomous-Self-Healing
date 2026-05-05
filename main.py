@@ -43,14 +43,14 @@ async def security_middleware(request: Request, call_next):
     request_history[client_ip] = [t for t in request_history[client_ip] if now - t < 60]
     
     if len(request_history[client_ip]) > 10:
-        return {"error": "Too many requests. Hacker-like activity detected!"}
+        return {"error": "Rate limit exceeded. Please slow down your requests."}
     
     request_history[client_ip].append(now)
     
     # Security Headers
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "ALLOWALL"
+    response.headers["Content-Security-Policy"] = "frame-ancestors *"
     return response
 
 class ChatRequest(BaseModel):
