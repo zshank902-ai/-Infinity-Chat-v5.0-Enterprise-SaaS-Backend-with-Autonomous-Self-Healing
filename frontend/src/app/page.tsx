@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { cn } from "@/lib/utils";
 
-const API_BASE = "http://localhost:7860";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:7860";
 
 export default function Dashboard() {
   const [messages, setMessages] = useState([
@@ -76,7 +76,8 @@ export default function Dashboard() {
     let reconnectTimeout: any;
 
     const connect = () => {
-      socket = new WebSocket(`ws://localhost:7860/ws/${sessionId}`);
+      const wsHost = API_BASE.replace("http", "ws");
+      socket = new WebSocket(`${wsHost}/ws/${sessionId}`);
 
       socket.onopen = () => {
         console.log("WebSocket Heartbeat Started.");
