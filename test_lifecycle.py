@@ -19,15 +19,15 @@ async def main():
         print("\n--- Testing Results ---")
         
         # Check for Zip
-        zip_exists = os.path.exists("d:/Python Workshop/infinity_chat/projects/lifecycle_test.zip")
+        zip_exists = os.path.exists("./projects/lifecycle_test.zip")
         print(f"Zip File Created: {zip_exists}")
         
         # Check for Metadata
-        meta_exists = os.path.exists("d:/Python Workshop/infinity_chat/memory/vault/lifecycle_test.json")
+        meta_exists = os.path.exists("./memory/vault/lifecycle_test.json")
         print(f"Project Memory Saved: {meta_exists}")
         
         # Check for Folder (Should be deleted)
-        folder_exists = os.path.exists("d:/Python Workshop/infinity_chat/projects/lifecycle_test")
+        folder_exists = os.path.exists("./projects/lifecycle_test")
         print(f"Source Folder Deleted: {not folder_exists}")
         
         print("\n[LIFECYCLE] Test passed! System is efficient and persistent.")

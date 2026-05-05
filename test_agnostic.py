@@ -20,7 +20,7 @@ async def main():
         print(response[:800] + "...")
         
         # Verify Zip
-        zip_exists = os.path.exists("d:/Python Workshop/infinity_chat/projects/node_swarm.zip")
+        zip_exists = os.path.exists("./projects/node_swarm.zip")
         print(f"Node.js Zip Created: {zip_exists}")
         
         print("\n[AGNOSTIC] Test complete. The engine is now language-independent!")

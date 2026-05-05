@@ -27,11 +27,11 @@ async def main():
     await agent.run_autonomous(req2, session_id)
     
     # Final check
-    lesson_exists = os.path.exists("d:/Python Workshop/infinity_chat/memory/lessons/evolution_1_lessons.txt")
+    lesson_exists = os.path.exists("./memory/lessons/evolution_1_lessons.txt")
     print(f"\nLesson Card Saved: {lesson_exists}")
     
     if lesson_exists:
-        with open("d:/Python Workshop/infinity_chat/memory/lessons/evolution_1_lessons.txt", "r") as f:
+        with open("./memory/lessons/evolution_1_lessons.txt", "r") as f:
             print("\n--- CONTENT OF LESSON CARD ---")
             print(f.read())
 
