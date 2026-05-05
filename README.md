@@ -1,3 +1,13 @@
+---
+title: Infinity Chat v5.0
+emoji: 😎
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # Infinity Chat v5.0: The Autonomous Enterprise SaaS Engine
 
 **Infinity Chat** is not just a chatbot; it is a high-performance, autonomous software engineering swarm designed for the industrial-grade SaaS era. Built with a "Self-Healing" core and "Distributed Memory," it represents the pinnacle of agentic AI development.
