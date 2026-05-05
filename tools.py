@@ -7,7 +7,8 @@ from duckduckgo_search import DDGS
 import re
 import boto3
 
-BASE_PROJECT_PATH = Path("d:/Python Workshop/infinity_chat/projects")
+BASE_PROJECT_PATH = Path("./projects")
+
 
 def create_directory(rel_path):
     full_path = BASE_PROJECT_PATH / rel_path

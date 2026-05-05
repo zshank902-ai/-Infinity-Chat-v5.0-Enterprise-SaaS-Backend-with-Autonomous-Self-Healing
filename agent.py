@@ -43,7 +43,8 @@ class CodingAgent:
         # CREATE ISOLATED WORKSPACE FOR SESSION
         import os
         from pathlib import Path
-        session_path = Path(f"d:/Python Workshop/infinity_chat/projects/{session_id}")
+        session_path = Path(f"./projects/{session_id}")
+
         session_path.mkdir(parents=True, exist_ok=True)
         self.current_project_path = str(session_path)
 

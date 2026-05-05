@@ -78,7 +78,8 @@ async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks)
             zip_match = re.search(r"\[ZIP: (.*?)\]", response_text)
             if zip_match:
                 zip_name = zip_match.group(1)
-                zip_file = f"d:/Python Workshop/infinity_chat/projects/{zip_name}.zip"
+                zip_file = f"./projects/{zip_name}.zip"
+
                 background_tasks.add_task(upload_to_cloud, zip_file)
 
         return ChatResponse(response=response_text, state=new_state)
@@ -87,7 +88,8 @@ async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks)
 
 @app.post("/upload")
 async def upload_file(session_id: str, file: UploadFile = File(...)):
-    temp_path = Path(f"d:/Python Workshop/infinity_chat/data/temp_{file.filename}")
+    temp_path = Path(f"./data/temp_{file.filename}")
+
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
@@ -122,7 +124,8 @@ async def upload_file(session_id: str, file: UploadFile = File(...)):
 @app.post("/stt")
 async def speech_to_text(file: UploadFile = File(...)):
     """Convert uploaded audio to text."""
-    temp_path = Path(f"d:/Python Workshop/infinity_chat/data/temp_{file.filename}")
+    temp_path = Path(f"./data/temp_{file.filename}")
+
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
@@ -142,7 +145,8 @@ async def speech_to_text(file: UploadFile = File(...)):
 @app.get("/tts")
 async def text_to_speech(text: str = Query(...)):
     """Convert text to speech audio file."""
-    output_path = Path("d:/Python Workshop/infinity_chat/data/tts_output.mp3")
+    output_path = Path("./data/tts_output.mp3")
+
     try:
         client = AsyncOpenAI(api_key=config.DEEPSEEK_KEYS[0])
         response = await client.audio.speech.create(

@@ -3,7 +3,8 @@ import os
 import time
 from pathlib import Path
 
-MEMORY_FILE = Path("d:/Python Workshop/infinity_chat/data/memory.json")
+MEMORY_FILE = Path("./data/memory.json")
+
 
 class RedisMemory:
     """Enterprise-grade distributed memory (Global Sync)."""
@@ -66,7 +67,8 @@ class Memory:
 
 class ProjectVault:
     def __init__(self):
-        self.vault_path = Path("d:/Python Workshop/infinity_chat/memory/vault")
+        self.vault_path = Path("./memory/vault")
+
         self.vault_path.mkdir(parents=True, exist_ok=True)
 
     def save_project_card(self, project_name, summary):
@@ -89,7 +91,8 @@ class ProjectVault:
 
 class LessonVault:
     def __init__(self):
-        self.lessons_path = Path("d:/Python Workshop/infinity_chat/memory/lessons")
+        self.lessons_path = Path("./memory/lessons")
+
         self.lessons_path.mkdir(parents=True, exist_ok=True)
 
     def save_lesson(self, project_name, lessons):
