@@ -60,6 +60,8 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     state: str
+    progress: int
+    phase: str
 
 @app.get("/")
 def read_root():
@@ -69,8 +71,22 @@ def read_root():
 async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks):
     try:
         response_text = await agent.run_autonomous(request.message, request.session_id)
-        new_state = agent.session_states.get(request.session_id, {}).get("state", "INTERVIEW")
+        session_data = agent.session_states.get(request.session_id, {})
+        new_state = session_data.get("state", "INTERVIEW")
         
+        # Calculate progress based on state
+        progress_map = {"INTERVIEW": 20, "CONFIRMATION": 40, "EXECUTION": 70, "COMPLETED": 100}
+        progress = progress_map.get(new_state, 10)
+        
+        # Determine phase
+        phase_map = {
+            "INTERVIEW": "Requirement Gathering",
+            "CONFIRMATION": "Technical Blueprinting",
+            "EXECUTION": f"Step {session_data.get('current_step', 0)} Execution",
+            "COMPLETED": "Project Finalized"
+        }
+        phase = phase_map.get(new_state, "Initializing")
+
         # Auto-upload project if zipped
         if "[ZIP:" in response_text:
             import re
@@ -79,10 +95,9 @@ async def chat_endpoint(request: ChatRequest, background_tasks: BackgroundTasks)
             if zip_match:
                 zip_name = zip_match.group(1)
                 zip_file = f"./projects/{zip_name}.zip"
-
                 background_tasks.add_task(upload_to_cloud, zip_file)
 
-        return ChatResponse(response=response_text, state=new_state)
+        return ChatResponse(response=response_text, state=new_state, progress=progress, phase=phase)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

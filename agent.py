@@ -185,43 +185,25 @@ class CodingAgent:
         # Handle MKDIR
         mkdir_matches = re.findall(r"\[MKDIR: (.*?)\]", text)
         for path in mkdir_matches:
-            create_directory(path)
+            create_directory(path, base_path=self.current_project_path)
             # Generic environment setup
             if "/" not in path and "\\" not in path:
-                setup_environment(path)
+                setup_environment(Path(self.current_project_path) / path)
 
         # Handle SETUP (Explicit call)
         if "[SETUP]" in text:
-            project_path_match = re.search(r"\[MKDIR: (.*?)\]", text)
-            if project_path_match:
-                setup_environment(project_path_match.group(1))
+            setup_environment(self.current_project_path)
 
         # Handle WRITE_FILE
         file_matches = re.findall(r"\[WRITE_FILE: (.*?)\](.*?)\[/WRITE_FILE\]", text, re.DOTALL)
         for path, content in file_matches:
-            write_file(path.strip(), content.strip())
+            write_file(path.strip(), content.strip(), base_path=self.current_project_path)
 
         # Handle RUN (with Self-Healing)
         run_matches = re.findall(r"\[RUN: (.*?)\]", text)
         for cmd in run_matches:
-            # Better project path detection
-            mkdir_search = re.search(r"\[MKDIR: (.*?)\]", text)
-            write_search = re.search(r"\[WRITE_FILE: (.*?)/", text)
-            
-            if mkdir_search:
-                self.current_project_path = mkdir_search.group(1)
-            elif write_search:
-                self.current_project_path = write_search.group(1).split('/')[0]
-            
-            rel_path = self.current_project_path
-            
-            # Optimization: If the command mentions the folder name, strip it since we are inside CWD
-            clean_cmd = cmd
-            if rel_path != "." and rel_path in clean_cmd:
-                clean_cmd = clean_cmd.replace(f"{rel_path}/", "").replace(f"{rel_path}\\", "")
-
-            print(f"[EXECUTION] Running '{clean_cmd}' in {rel_path} (Attempt {attempt})...")
-            output = run_in_env(rel_path, clean_cmd)
+            print(f"[EXECUTION] Running '{cmd}' in {self.current_project_path} (Attempt {attempt})...")
+            output = run_in_env(self.current_project_path, cmd)
             print(f"Output: {output[:200]}...")
 
             if "Error" in output or "Exception" in output:
@@ -232,7 +214,7 @@ class CodingAgent:
         # Handle ZIP
         zip_matches = re.findall(r"\[ZIP: (.*?)\]", text)
         for path in zip_matches:
-            zip_directory(path)
+            zip_directory(path, base_path=self.current_project_path)
 
         # Handle SEARCH
         search_matches = re.findall(r"\[SEARCH: (.*?)\]", text)

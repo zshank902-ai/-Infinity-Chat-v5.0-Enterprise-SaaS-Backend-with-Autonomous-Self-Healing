@@ -41,20 +41,25 @@ class APIRouter:
             else:
                 provider = "groq" # Tier 2: Developer/Fast
 
-        try:
-            if provider == "gemini":
-                return await self._call_gemini(prompt, image_path)
-            elif provider == "groq":
-                return await self._call_groq(prompt)
-            elif provider == "deepseek":
-                return await self._call_deepseek(prompt)
-            elif provider == "local":
-                return await self._call_ollama(prompt)
-            else:
-                return await self._call_groq(prompt)
-        except Exception as e:
-            print(f"[ROUTER] Provider {provider} failed: {e}. Switching to Local Fallback...")
-            return await self._call_ollama(prompt)
+        # RETRY LOGIC (Max 2 retries)
+        for attempt in range(3):
+            try:
+                if provider == "gemini":
+                    return await self._call_gemini(prompt, image_path)
+                elif provider == "groq":
+                    return await self._call_groq(prompt)
+                elif provider == "deepseek":
+                    return await self._call_deepseek(prompt)
+                elif provider == "local":
+                    return await self._call_ollama(prompt)
+                else:
+                    return await self._call_groq(prompt)
+            except Exception as e:
+                print(f"[ROUTER] Provider {provider} failed (Attempt {attempt+1}): {e}")
+                if attempt == 2: # Last attempt
+                    print(f"[ROUTER] All retries for {provider} failed. Switching to Local Fallback...")
+                    return await self._call_ollama(prompt)
+                await asyncio.sleep(2) # Wait before retry
 
     async def _call_groq(self, prompt):
         client = self.get_groq_client()

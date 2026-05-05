@@ -10,13 +10,13 @@ import boto3
 BASE_PROJECT_PATH = Path("./projects")
 
 
-def create_directory(rel_path):
-    full_path = BASE_PROJECT_PATH / rel_path
+def create_directory(rel_path, base_path=BASE_PROJECT_PATH):
+    full_path = Path(base_path) / rel_path
     full_path.mkdir(parents=True, exist_ok=True)
     return f"Directory created: {rel_path}"
 
-def write_file(rel_path, content):
-    full_path = BASE_PROJECT_PATH / rel_path
+def write_file(rel_path, content, base_path=BASE_PROJECT_PATH):
+    full_path = Path(base_path) / rel_path
     # Ensure parent directories exist
     full_path.parent.mkdir(parents=True, exist_ok=True)
     with open(full_path, "w", encoding="utf-8") as f:
@@ -194,11 +194,11 @@ def extract_text_from_pptx(file_path):
     except Exception as e:
         return f"PPTX Error: {e}"
 
-def zip_directory(rel_path):
-    full_path = BASE_PROJECT_PATH / rel_path
-    zip_path = BASE_PROJECT_PATH / f"{rel_path}.zip"
+def zip_directory(rel_path, base_path=BASE_PROJECT_PATH):
+    full_path = Path(base_path) / rel_path
+    zip_path = Path(base_path) / f"{rel_path}.zip"
     if full_path.exists():
-        shutil.make_archive(str(BASE_PROJECT_PATH / rel_path), 'zip', full_path)
+        shutil.make_archive(str(Path(base_path) / rel_path), 'zip', full_path)
         return f"Project zipped successfully: {rel_path}.zip"
     return "Error: Directory not found."
 
